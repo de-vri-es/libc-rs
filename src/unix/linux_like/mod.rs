@@ -1581,6 +1581,9 @@ extern "C" {
         attr: *mut pthread_condattr_t,
         pshared: ::c_int,
     ) -> ::c_int;
+    // For Android, we directly use syscall(),
+    // because old Android libc doesn't expose accept4().
+    #[cfg(not(target_os = "android"))]
     pub fn accept4(
         fd: ::c_int,
         addr: *mut ::sockaddr,
@@ -1708,4 +1711,18 @@ cfg_if! {
     } else {
         // Unknown target_os
     }
+}
+
+// Sadly, Android before 5.0 (API level 21), the accept4 syscall is not exposed
+// by the libc. As work-around, we implement it through `syscall` directly.
+// This can be removed if the minimum version of Android is bumped.
+// Don't forget to enable the regular `accept4()` above again if you do.
+#[cfg(target_os = "android")]
+pub unsafe fn accept4(
+    fd: ::c_int,
+    addr: *mut ::sockaddr,
+    len: *mut ::socklen_t,
+    flg: ::c_int,
+) -> ::c_int {
+    syscall(SYS_accept4, fd, addr, len, flg) as ::c_int
 }
